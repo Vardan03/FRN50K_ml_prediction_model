@@ -1,0 +1,6 @@
+-- How many stores and cities are in the dataset?
+select 
+	count(distinct store_id) as store,
+	count(distinct city_id) as city  
+from sales_data
+

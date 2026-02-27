@@ -1,0 +1,192 @@
+CREATE VIEW hourly_business_summary AS
+SELECT
+    sd.city_id,
+    sd.store_id,
+    sd.product_id,
+    sd.first_category_id,
+    sd.second_category_id,
+    sd.third_category_id,
+
+    sd.dt::date AS sale_date,
+    h.hour_of_day,
+
+    (string_to_array(
+        trim(
+            regexp_replace(
+                replace(replace(sd.hours_sale, '[',''),']',''),
+                '\s+',
+                ' ',
+                'g'
+           	 )
+        	),
+        	' '
+	    )::numeric[]
+	)[h.hour_of_day + 1] AS hourly_sales,
+
+    EXTRACT(DOW FROM sd.dt::date) AS day_of_week,
+
+    CASE 
+        WHEN EXTRACT(DOW FROM sd.dt::date) IN (0,6) THEN 1
+        ELSE 0
+    END AS is_weekend,
+
+    CASE
+        WHEN h.hour_of_day BETWEEN 6 AND 11 THEN 'morning'
+        WHEN h.hour_of_day BETWEEN 12 AND 17 THEN 'afternoon'
+        WHEN h.hour_of_day BETWEEN 18 AND 22 THEN 'evening'
+        ELSE 'night'
+    END AS time_of_day,
+
+    CASE WHEN sd.discount > 0 THEN 1 ELSE 0 END AS is_promo,
+    sd.holiday_flag,
+    sd.activity_flag,
+
+    CASE 
+        WHEN sd.stock_hour6_22_cnt = 0 THEN 1
+        ELSE 0
+    END AS is_stockout,
+
+    CASE
+        WHEN sd.precpt > 0 THEN 'bad_weather'
+        ELSE 'good_weather'
+    END AS weather_category,
+
+    sd.avg_temperature,
+    sd.avg_humidity,
+    sd.avg_wind_level
+
+FROM sales_data sd
+CROSS JOIN generate_series(0,23) AS h(hour_of_day);
+
+
+
+--------------------------------
+
+
+CREATE OR REPLACE VIEW store_performance_dashboard AS
+SELECT
+    store_id,
+    city_id,
+
+    COUNT(*) AS total_store_hours,
+    SUM(hourly_sales) AS total_sales,
+    AVG(hourly_sales) AS avg_hourly_sales,
+
+    SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS active_hours,
+
+    AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END) AS avg_sales_when_active,
+
+    SUM(CASE WHEN is_promo = 1 THEN hourly_sales ELSE 0 END) AS promo_sales,
+    SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END) AS regular_sales,
+
+    CASE 
+        WHEN SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END) = 0 THEN NULL
+        ELSE 
+            SUM(CASE WHEN is_promo = 1 THEN hourly_sales ELSE 0 END)
+            / SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END)
+    END AS promo_lift_ratio,
+
+    AVG(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_rate,
+
+    SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END) AS sales_during_stockout,
+
+
+    AVG(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS engagement_rate,
+
+    STDDEV(hourly_sales) AS sales_stddev,
+
+    CASE 
+        WHEN AVG(hourly_sales) = 0 THEN NULL
+        ELSE STDDEV(hourly_sales) / AVG(hourly_sales)
+    END AS sales_variability
+
+FROM hourly_business_summary
+GROUP BY store_id, city_id;
+
+
+
+
+
+
+
+
+
+
+
+
+----------
+
+
+
+
+
+
+CREATE OR REPLACE VIEW category_intelligence AS
+SELECT
+    first_category_id,
+    second_category_id,
+    third_category_id,
+
+
+    COUNT(DISTINCT store_id) AS stores_present,
+    COUNT(*) AS total_category_hours,
+    SUM(hourly_sales) AS total_sales,
+    AVG(hourly_sales) AS avg_hourly_sales,
+
+
+    STDDEV(hourly_sales) AS sales_stddev,
+
+    CASE 
+        WHEN AVG(hourly_sales) = 0 THEN NULL
+        ELSE STDDEV(hourly_sales) / AVG(hourly_sales)
+    END AS sales_variability,
+
+
+    AVG(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_rate,
+
+    SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END) AS sales_during_stockout,
+
+
+    AVG(CASE WHEN is_promo = 1 THEN hourly_sales END) AS avg_sales_promo,
+    AVG(CASE WHEN is_promo = 0 THEN hourly_sales END) AS avg_sales_regular,
+
+    CASE
+        WHEN AVG(CASE WHEN is_promo = 0 THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN is_promo = 1 THEN hourly_sales END)
+            /
+            AVG(CASE WHEN is_promo = 0 THEN hourly_sales END)
+    END AS promo_lift_ratio,
+
+
+    AVG(CASE WHEN weather_category = 'bad_weather' THEN hourly_sales END) AS avg_sales_bad_weather,
+    AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END) AS avg_sales_good_weather,
+
+    CASE
+        WHEN AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN weather_category = 'bad_weather' THEN hourly_sales END)
+            /
+            AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END)
+    END AS weather_impact_ratio,
+
+    AVG(CASE WHEN holiday_flag = 1 THEN hourly_sales END) AS avg_sales_holiday,
+    AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END) AS avg_sales_regular_day,
+
+    CASE
+        WHEN AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN holiday_flag = 1 THEN hourly_sales END)
+            /
+            AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END)
+    END AS holiday_lift_ratio,
+
+
+    AVG(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS engagement_rate
+
+FROM hourly_business_summary
+GROUP BY
+    first_category_id,
+    second_category_id,
+    third_category_id;
+

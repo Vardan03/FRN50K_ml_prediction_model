@@ -1,0 +1,13 @@
+(
+    SELECT *
+    FROM store_performance_dashboard
+    ORDER BY total_sales DESC
+    LIMIT 5
+)
+UNION ALL
+(
+    SELECT *
+    FROM store_performance_dashboard
+    ORDER BY stockout_rate DESC
+    LIMIT 5
+);

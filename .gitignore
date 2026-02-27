@@ -2,3 +2,5 @@
 dataset/
 models/trained
 app.log
+venv/
+*.md

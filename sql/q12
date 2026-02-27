@@ -1,0 +1,13 @@
+-- Compare average sales between in-stock and stocked-out hours
+SELECT 
+    CASE 
+        WHEN is_stockout = 1 THEN 'Stockout Hours'
+        ELSE 'In-Stock Hours'
+    END AS stock_status,
+    COUNT(*) AS total_hours,
+    ROUND(AVG(hourly_sales), 2) AS avg_sales,
+    ROUND(SUM(hourly_sales), 2) AS total_sales,
+    ROUND(AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END), 2) AS avg_sales_when_active,
+    ROUND(100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS activity_rate_pct
+FROM hourly_business_summary
+GROUP BY is_stockout;

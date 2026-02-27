@@ -1,0 +1,43 @@
+-- Simplified store health score (исправлено)
+WITH store_stats AS (
+    SELECT 
+        store_id,
+        city_id,
+        ROUND(SUM(hourly_sales)::numeric, 2) AS total_sales,
+        ROUND(AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END)::numeric, 2) AS avg_sale_value,
+        ROUND((100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 1) AS activity_pct,
+        ROUND((100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 2) AS stockout_pct
+    FROM hourly_business_summary
+    GROUP BY store_id, city_id
+),
+rankings AS (
+    SELECT 
+        *,
+        ROUND((PERCENT_RANK() OVER (ORDER BY total_sales DESC) * 100)::numeric, 1) AS sales_percentile,
+        ROUND((PERCENT_RANK() OVER (ORDER BY activity_pct DESC) * 100)::numeric, 1) AS activity_percentile,
+        ROUND((PERCENT_RANK() OVER (ORDER BY stockout_pct ASC) * 100)::numeric, 1) AS stockout_percentile  -- Lower stockouts = higher percentile
+    FROM store_stats
+)
+SELECT 
+    store_id,
+    city_id,
+    CONCAT('$', total_sales) AS total_sales,
+    activity_pct || '%' AS activity_rate,
+    stockout_pct || '%' AS stockout_rate,
+    
+    sales_percentile AS sales_score,
+    activity_percentile AS activity_score,
+    stockout_percentile AS efficiency_score,
+    
+    ROUND(((sales_percentile + activity_percentile + stockout_percentile) / 3)::numeric, 1) AS store_health_score,
+    
+    CASE 
+        WHEN (sales_percentile + activity_percentile + stockout_percentile) / 3 >= 80 THEN 'A'
+        WHEN (sales_percentile + activity_percentile + stockout_percentile) / 3 >= 60 THEN 'B'
+        WHEN (sales_percentile + activity_percentile + stockout_percentile) / 3 >= 40 THEN 'C'
+        WHEN (sales_percentile + activity_percentile + stockout_percentile) / 3 >= 20 THEN 'D'
+        ELSE 'F'
+    END AS health_grade
+
+FROM rankings
+ORDER BY store_health_score DESC;

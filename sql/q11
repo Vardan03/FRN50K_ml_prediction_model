@@ -1,0 +1,4 @@
+-- What percentage of total hours experienced stockouts?
+SELECT 
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS stockout_percentage
+FROM hourly_business_summary;

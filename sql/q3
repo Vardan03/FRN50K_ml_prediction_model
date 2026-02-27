@@ -1,0 +1,8 @@
+-- How many different products and product categories exist?
+
+select
+	count(distinct product_id) as product,
+	count(distinct first_category_id) as first_category,
+	count(distinct second_category_id) as second_category_id,
+	count(distinct third_category_id) as third_category_id
+from sales_data

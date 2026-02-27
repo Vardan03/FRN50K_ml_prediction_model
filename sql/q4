@@ -1,0 +1,5 @@
+-- What is the total sales volume across all data
+
+select
+	sum(sale_amount)
+from sales_data

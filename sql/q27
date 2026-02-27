@@ -1,0 +1,18 @@
+-- Weather impact on sales by product category
+SELECT 
+    hbs.first_category_id,
+    hbs.second_category_id,
+    hbs.third_category_id,
+    hbs.weather_category,
+    
+    COUNT(*) AS total_hours,
+    ROUND(AVG(hbs.hourly_sales)::numeric, 2) AS avg_sales,
+    ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY hbs.hourly_sales)::numeric, 2) AS median_sales,
+    ROUND(SUM(hbs.hourly_sales)::numeric, 2) AS total_sales,
+    ROUND((100.0 * SUM(CASE WHEN hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 1) AS activity_rate_pct,
+    
+    ROUND((100.0 * SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 2) AS stockout_rate_pct
+
+FROM hourly_business_summary hbs
+GROUP BY hbs.first_category_id, hbs.second_category_id, hbs.third_category_id, hbs.weather_category
+ORDER BY hbs.first_category_id, hbs.second_category_id, hbs.third_category_id, hbs.weather_category;

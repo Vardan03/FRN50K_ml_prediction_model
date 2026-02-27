@@ -1,0 +1,12 @@
+-- Show total sales by day of week. Which days generate most sales?
+
+select 
+	to_char(dt, 'Day') as day_of_week,
+	sum(sale_amount) as sale_day
+from sales_data
+group by day_of_week
+
+
+
+
+

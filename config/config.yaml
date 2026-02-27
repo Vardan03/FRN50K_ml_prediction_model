@@ -1,6 +1,6 @@
 data:
-  train_path: "/Users/yenokhakobyan/Projects/FRN_second_attempt/dataset/raw/train.parquet"
-  eval_path: "/Users/yenokhakobyan/Projects/FRN_second_attempt/dataset/raw/eval.csv"
+  train_path: "/home/vardan/Рабочий стол/Vardan/picsart/Data_Scince/project/FRN50K_ml_prediction_model/dataset/raw/train.parquet"
+  eval_path: "/home/vardan/Рабочий стол/Vardan/picsart/Data_Scince/project/FRN50K_ml_prediction_model/dataset/raw/eval.csv"
   fracture: 0.1  
   target_column: "sale_amount"
   datetime_column: "dt"

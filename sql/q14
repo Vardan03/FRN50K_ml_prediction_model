@@ -1,0 +1,29 @@
+-- Stockout rate by hour of day
+SELECT 
+    hour_of_day,
+    CASE 
+        WHEN hour_of_day BETWEEN 6 AND 11 THEN
+        WHEN hour_of_day BETWEEN 12 AND 17 THEN
+        WHEN hour_of_day BETWEEN 18 AND 22 THEN
+        ELSE
+    END AS time_period,
+    
+    COUNT(*) AS total_hours_observed,
+    
+    SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_hours,
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS stockout_rate_pct,
+    
+    ROUND(AVG(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE NULL END), 2) AS avg_sales_during_stockout,
+    ROUND(SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END), 2) AS total_sales_during_stockout,
+    
+    ROUND(AVG(CASE WHEN is_stockout = 0 THEN hourly_sales END), 2) AS avg_sales_in_stock,
+    
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 1 AND hourly_sales > 0 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END), 0), 1) AS activity_rate_during_stockout,
+    
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 0 AND hourly_sales > 0 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN is_stockout = 0 THEN 1 ELSE 0 END), 0), 1) AS activity_rate_in_stock
+
+FROM hourly_business_summary
+GROUP BY hour_of_day
+ORDER BY hour_of_day;

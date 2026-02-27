@@ -1,0 +1,17 @@
+-- Compare average sales between holiday and non-holiday periods.
+
+
+
+select 
+	avg(sale_amount) as sale
+from sales_data
+where holiday_flag = 1
+
+union all
+
+select
+	avg(sale_amount) as sale
+from sales_data
+where holiday_flag = 0
+
+

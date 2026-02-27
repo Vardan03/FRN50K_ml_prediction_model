@@ -1,0 +1,28 @@
+-- Identify stores with high sales but high stockout rates
+SELECT 
+    store_id,
+    city_id,
+    total_sales,
+    avg_hourly_sales,
+    stockout_rate,
+    engagement_rate,
+    sales_variability,
+    
+    ROUND(
+        (stockout_rate * 100) * (total_sales / 1000), 
+        2
+    ) AS sales_stockout_risk_score,
+    
+
+    CASE 
+        WHEN total_sales > 5000 AND stockout_rate > 0.15 THEN 'CRITICAL - High revenue, frequent stockouts'
+        WHEN total_sales > 3000 AND stockout_rate > 0.12 THEN 'HIGH PRIORITY - Good revenue, stockout problem'
+        WHEN total_sales > 2000 AND stockout_rate > 0.10 THEN 'MODERATE - Monitor closely'
+        WHEN total_sales > 1000 AND stockout_rate > 0.08 THEN 'EMERGING - Watch for patterns'
+        ELSE 'NORMAL - Acceptable levels'
+    END AS priority_level
+
+FROM store_performance_dashboard
+WHERE stockout_rate > 0.05
+ORDER BY total_sales DESC, stockout_rate DESC
+LIMIT 20;

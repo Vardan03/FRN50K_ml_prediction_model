@@ -1,0 +1,37 @@
+-- Store-product combinations with high sales potential but frequent stockouts
+SELECT 
+    hbs.store_id,
+    hbs.product_id,
+    hbs.first_category_id,
+    hbs.second_category_id,
+    hbs.third_category_id,
+    
+    COUNT(*) AS total_hours_analyzed,
+    ROUND(SUM(hbs.hourly_sales)::numeric, 2) AS total_sales,
+    ROUND(AVG(hbs.hourly_sales)::numeric, 2) AS avg_hourly_sales,
+    ROUND(AVG(CASE WHEN hbs.hourly_sales > 0 THEN hbs.hourly_sales END)::numeric, 2) AS avg_sales_when_active,
+    
+    SUM(CASE WHEN hbs.hourly_sales > 0 THEN 1 ELSE 0 END) AS active_hours,
+    ROUND((100.0 * SUM(CASE WHEN hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 1) AS activity_rate_pct,
+    
+    SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_hours,
+    ROUND((100.0 * SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 2) AS stockout_rate_pct,
+    
+	ROUND(
+        (AVG(CASE WHEN hbs.hourly_sales > 0 THEN hbs.hourly_sales END) * 
+         SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END))::numeric, 
+    2) AS estimated_opportunity_cost,
+    
+    ROUND(
+        (AVG(CASE WHEN hbs.hourly_sales > 0 THEN hbs.hourly_sales END) * 
+         SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) * 
+         ((100.0 * SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*)) / 100))::numeric, 
+    2) AS priority_score
+
+FROM hourly_business_summary hbs
+GROUP BY hbs.store_id, hbs.product_id, hbs.first_category_id, hbs.second_category_id, hbs.third_category_id
+HAVING COUNT(*) >= 48 
+   AND SUM(CASE WHEN hbs.hourly_sales > 0 THEN 1 ELSE 0 END) >= 12 
+   AND SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) >= 5
+ORDER BY priority_score DESC
+LIMIT 20;

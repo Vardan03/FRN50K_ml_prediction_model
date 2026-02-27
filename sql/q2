@@ -1,0 +1,6 @@
+-- What date range does our data cover?
+select 
+	min(dt),
+	max(dt)
+from sales_data
+

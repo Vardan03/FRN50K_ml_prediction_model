@@ -75,6 +75,25 @@ class ForecastingMetrics:
         return (np.mean(y_pred - y_true) / mean_actual) * 100
     
     @staticmethod
+    def r_squared(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        R² Score (Coefficient of Determination).
+        
+        Teaching insight: R² measures the proportion of variance in the target
+        variable that is explained by the model. Range: (-∞, 1]
+        - 1.0 = perfect predictions
+        - 0.0 = model no better than predicting mean
+        - <0 = model worse than naive mean forecast
+        """
+        ss_res = np.sum((y_true - y_pred) ** 2)
+        ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+        
+        if ss_tot == 0:
+            return np.nan
+        
+        return 1 - (ss_res / ss_tot)
+    
+    @staticmethod
     def mean_absolute_scaled_error(y_true: np.ndarray, y_pred: np.ndarray, y_train: np.ndarray, seasonal_period: int = 1) -> float:
         """
         Mean Absolute Scaled Error - compares model performance to naive forecast.
@@ -107,7 +126,8 @@ class ForecastingMetrics:
             'MAPE': ForecastingMetrics.mean_absolute_percentage_error(y_true, y_pred),
             'sMAPE': ForecastingMetrics.symmetric_mean_absolute_percentage_error(y_true, y_pred),
             'Bias': ForecastingMetrics.bias(y_true, y_pred),
-            'Bias_Percentage': ForecastingMetrics.bias_percentage(y_true, y_pred)
+            'Bias_Percentage': ForecastingMetrics.bias_percentage(y_true, y_pred),
+            'R²': ForecastingMetrics.r_squared(y_true, y_pred)
         }
         
         # Add MASE if training data is available

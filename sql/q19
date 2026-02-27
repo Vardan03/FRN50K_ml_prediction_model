@@ -1,0 +1,21 @@
+-- Product categories ranked by total sales
+SELECT 
+    first_category_id,
+    second_category_id,
+    third_category_id,
+    ROUND(SUM(hourly_sales), 2) AS total_sales,
+    COUNT(*) AS total_hours_analyzed,
+    ROUND(AVG(hourly_sales), 2) AS avg_hourly_sales,
+    
+    SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS active_hours,
+    ROUND(100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS activity_rate_pct,
+    
+    ROUND(MAX(hourly_sales), 2) AS peak_hourly_sales,
+    PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY hourly_sales) AS p90_sales,
+    
+    SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END) AS sales_during_stockout,
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS stockout_rate_pct
+
+FROM hourly_business_summary
+GROUP BY first_category_id, second_category_id, third_category_id
+ORDER BY total_sales DESC;

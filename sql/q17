@@ -1,0 +1,28 @@
+-- Cities ranked by average sales per store
+WITH store_sales AS (
+    SELECT 
+        city_id,
+        store_id,
+        ROUND(SUM(hourly_sales), 2) AS store_total_sales,
+        COUNT(*) AS store_hours_analyzed,
+        ROUND(AVG(hourly_sales), 2) AS store_avg_hourly_sales
+    FROM hourly_business_summary
+    GROUP BY city_id, store_id
+)
+SELECT 
+    city_id,
+    COUNT(DISTINCT store_id) AS number_of_stores,
+    ROUND(SUM(store_total_sales), 2) AS city_total_sales,
+    ROUND(AVG(store_total_sales), 2) AS avg_sales_per_store,
+    ROUND(AVG(store_avg_hourly_sales), 2) AS avg_hourly_sales_per_store,
+    ROUND(STDDEV(store_total_sales), 2) AS sales_variability_among_stores,
+    
+    ROUND(MIN(store_total_sales), 2) AS lowest_store_sales,
+    ROUND(MAX(store_total_sales), 2) AS highest_store_sales,
+    
+    ROUND(MAX(store_total_sales) / NULLIF(MIN(store_total_sales), 0), 2) AS top_to_bottom_ratio
+
+FROM store_sales
+GROUP BY city_id
+HAVING COUNT(DISTINCT store_id) >= 3
+ORDER BY avg_sales_per_store DESC;

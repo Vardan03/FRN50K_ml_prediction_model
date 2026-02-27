@@ -1,0 +1,7 @@
+-- How many hours had zero sales vs non-zero sales?
+
+select 
+	sum(case when hour_value = 0 then 1 else 0 end) as zero_sales_hours,
+	sum(case when hour_value > 0 then 1 else 0 end) as non_zero_sales_hours
+from sales_data,
+unnest(hours_sale_arr) as hour_value;

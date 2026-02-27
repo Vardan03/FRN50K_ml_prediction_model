@@ -1,0 +1,25 @@
+-- Top 5 stores with worst stockout rates
+SELECT 
+    hbs.store_id,
+    hbs.city_id,
+    COUNT(*) AS total_hours_analyzed,
+    SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_hours,
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS stockout_rate_pct,
+    
+    ROUND(SUM(hbs.hourly_sales), 2) AS total_sales,
+    ROUND(SUM(CASE WHEN hbs.is_stockout = 1 THEN hbs.hourly_sales ELSE 0 END), 2) AS sales_during_stockout,
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_stockout = 1 THEN hbs.hourly_sales ELSE 0 END) / 
+          NULLIF(SUM(hbs.hourly_sales), 0), 2) AS sales_impact_pct,
+    
+    ROUND(AVG(CASE WHEN hbs.is_stockout = 0 THEN hbs.hourly_sales END), 2) AS avg_sales_in_stock,
+    ROUND(AVG(CASE WHEN hbs.is_stockout = 1 THEN hbs.hourly_sales END), 2) AS avg_sales_during_stockout,
+    
+    ROUND(100.0 * SUM(CASE WHEN hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS overall_activity_rate,
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_stockout = 1 AND hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN hbs.is_stockout = 1 THEN 1 ELSE 0 END), 0), 1) AS activity_rate_during_stockout
+
+FROM hourly_business_summary hbs
+GROUP BY hbs.store_id, hbs.city_id
+HAVING COUNT(*) >= 100
+ORDER BY stockout_rate_pct DESC
+LIMIT 5;

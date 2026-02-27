@@ -1,0 +1,39 @@
+CREATE OR REPLACE VIEW store_performance_dashboard AS
+SELECT
+    store_id,
+    city_id,
+
+    COUNT(*) AS total_store_hours,
+    SUM(hourly_sales) AS total_sales,
+    AVG(hourly_sales) AS avg_hourly_sales,
+
+    SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS active_hours,
+
+    AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END) AS avg_sales_when_active,
+
+    SUM(CASE WHEN is_promo = 1 THEN hourly_sales ELSE 0 END) AS promo_sales,
+    SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END) AS regular_sales,
+
+    CASE 
+        WHEN SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END) = 0 THEN NULL
+        ELSE 
+            SUM(CASE WHEN is_promo = 1 THEN hourly_sales ELSE 0 END)
+            / SUM(CASE WHEN is_promo = 0 THEN hourly_sales ELSE 0 END)
+    END AS promo_lift_ratio,
+
+    AVG(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_rate,
+
+    SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END) AS sales_during_stockout,
+
+
+    AVG(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS engagement_rate,
+
+    STDDEV(hourly_sales) AS sales_stddev,
+
+    CASE 
+        WHEN AVG(hourly_sales) = 0 THEN NULL
+        ELSE STDDEV(hourly_sales) / AVG(hourly_sales)
+    END AS sales_variability
+
+FROM hourly_business_summary
+GROUP BY store_id, city_id;

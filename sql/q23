@@ -1,0 +1,37 @@
+-- Categories ranked by promotional lift
+SELECT 
+    hbs.first_category_id,
+    hbs.second_category_id,
+    hbs.third_category_id,
+    
+    ROUND(AVG(CASE WHEN hbs.is_promo = 0 THEN hbs.hourly_sales END), 2) AS avg_sales_regular,
+    
+    ROUND(AVG(CASE WHEN hbs.is_promo = 1 THEN hbs.hourly_sales END), 2) AS avg_sales_promo,
+    
+    ROUND(
+        (AVG(CASE WHEN hbs.is_promo = 1 THEN hbs.hourly_sales END) / 
+         NULLIF(AVG(CASE WHEN hbs.is_promo = 0 THEN hbs.hourly_sales END), 0) - 1
+        ) * 100, 
+    1) AS promo_lift_percentage,
+    
+    COUNT(*) AS total_hours,
+    SUM(CASE WHEN hbs.is_promo = 1 THEN 1 ELSE 0 END) AS promo_hours,
+    SUM(CASE WHEN hbs.is_promo = 0 THEN 1 ELSE 0 END) AS regular_hours,
+    
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_promo = 1 AND hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN hbs.is_promo = 1 THEN 1 ELSE 0 END), 0), 1) AS promo_activity_rate,
+    
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_promo = 0 AND hbs.hourly_sales > 0 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN hbs.is_promo = 0 THEN 1 ELSE 0 END), 0), 1) AS regular_activity_rate,
+    
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_promo = 1 AND hbs.is_stockout = 1 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN hbs.is_promo = 1 THEN 1 ELSE 0 END), 0), 2) AS stockout_rate_during_promo,
+    
+    ROUND(100.0 * SUM(CASE WHEN hbs.is_promo = 0 AND hbs.is_stockout = 1 THEN 1 ELSE 0 END) / 
+          NULLIF(SUM(CASE WHEN hbs.is_promo = 0 THEN 1 ELSE 0 END), 0), 2) AS stockout_rate_regular
+
+FROM hourly_business_summary hbs
+GROUP BY hbs.first_category_id, hbs.second_category_id, hbs.third_category_id
+HAVING SUM(CASE WHEN hbs.is_promo = 1 THEN 1 ELSE 0 END) >= 24  -- At least 24 hours of promo data
+   AND SUM(CASE WHEN hbs.is_promo = 0 THEN 1 ELSE 0 END) >= 48  -- At least 48 hours of regular data
+ORDER BY promo_lift_percentage DESC;

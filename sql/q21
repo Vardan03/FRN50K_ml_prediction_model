@@ -1,0 +1,26 @@
+-- Compare average sales between discounted and regular price hours
+SELECT 
+    CASE 
+        WHEN is_promo = 1 THEN 'DISCOUNTED HOURS (promo active)'
+        ELSE 'REGULAR PRICE HOURS'
+    END AS price_status,
+    COUNT(*) AS total_hours,
+    ROUND(AVG(hourly_sales), 2) AS avg_sales,
+    ROUND(SUM(hourly_sales), 2) AS total_sales,
+    ROUND(AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END), 2) AS avg_sales_when_active,
+    ROUND(100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS activity_rate_pct,
+    
+    ROUND(MAX(hourly_sales), 2) AS peak_sales,
+    PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY hourly_sales) AS p90_sales,
+    
+    ROUND(100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS stockout_rate_pct,
+    
+    ROUND(
+        (AVG(CASE WHEN is_promo = 1 THEN hourly_sales END) / 
+         NULLIF(AVG(CASE WHEN is_promo = 0 THEN hourly_sales END), 0) - 1
+        ) * 100, 
+    1) AS promo_lift_percentage
+
+FROM hourly_business_summary
+GROUP BY is_promo
+ORDER BY is_promo DESC;

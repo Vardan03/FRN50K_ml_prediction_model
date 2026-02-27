@@ -1,0 +1,68 @@
+CREATE OR REPLACE VIEW category_intelligence AS
+SELECT
+    first_category_id,
+    second_category_id,
+    third_category_id,
+
+
+    COUNT(DISTINCT store_id) AS stores_present,
+    COUNT(*) AS total_category_hours,
+    SUM(hourly_sales) AS total_sales,
+    AVG(hourly_sales) AS avg_hourly_sales,
+
+
+    STDDEV(hourly_sales) AS sales_stddev,
+
+    CASE 
+        WHEN AVG(hourly_sales) = 0 THEN NULL
+        ELSE STDDEV(hourly_sales) / AVG(hourly_sales)
+    END AS sales_variability,
+
+
+    AVG(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_rate,
+
+    SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END) AS sales_during_stockout,
+
+
+    AVG(CASE WHEN is_promo = 1 THEN hourly_sales END) AS avg_sales_promo,
+    AVG(CASE WHEN is_promo = 0 THEN hourly_sales END) AS avg_sales_regular,
+
+    CASE
+        WHEN AVG(CASE WHEN is_promo = 0 THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN is_promo = 1 THEN hourly_sales END)
+            /
+            AVG(CASE WHEN is_promo = 0 THEN hourly_sales END)
+    END AS promo_lift_ratio,
+
+
+    AVG(CASE WHEN weather_category = 'bad_weather' THEN hourly_sales END) AS avg_sales_bad_weather,
+    AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END) AS avg_sales_good_weather,
+
+    CASE
+        WHEN AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN weather_category = 'bad_weather' THEN hourly_sales END)
+            /
+            AVG(CASE WHEN weather_category = 'good_weather' THEN hourly_sales END)
+    END AS weather_impact_ratio,
+
+    AVG(CASE WHEN holiday_flag = 1 THEN hourly_sales END) AS avg_sales_holiday,
+    AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END) AS avg_sales_regular_day,
+
+    CASE
+        WHEN AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END) = 0 THEN NULL
+        ELSE 
+            AVG(CASE WHEN holiday_flag = 1 THEN hourly_sales END)
+            /
+            AVG(CASE WHEN holiday_flag = 0 THEN hourly_sales END)
+    END AS holiday_lift_ratio,
+
+
+    AVG(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) AS engagement_rate
+
+FROM hourly_business_summary
+GROUP BY
+    first_category_id,
+    second_category_id,
+    third_category_id;

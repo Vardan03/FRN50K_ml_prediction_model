@@ -1,0 +1,5 @@
+SELECT *
+FROM category_intelligence
+WHERE promo_lift_ratio > 1.2
+  AND stockout_rate > 0.2
+ORDER BY promo_lift_ratio DESC;

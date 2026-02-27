@@ -1,0 +1,26 @@
+-- Compare sales between activity_flag = 1 and activity_flag = 0
+SELECT 
+    CASE 
+        WHEN activity_flag = 1 THEN 'ACTIVITY DAY (promotions/events)'
+        ELSE 'REGULAR DAY'
+    END AS day_type,
+    COUNT(*) AS total_hours,
+    ROUND(CAST(AVG(hourly_sales) AS numeric), 2) AS avg_sales,
+    ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY hourly_sales) AS numeric), 2) AS median_sales,
+    ROUND(CAST(SUM(hourly_sales) AS numeric), 2) AS total_sales,
+    ROUND(CAST(100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*) AS numeric), 1) AS activity_rate_pct,
+    
+    ROUND(CAST(MAX(hourly_sales) AS numeric), 2) AS peak_sales,
+    ROUND(CAST(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY hourly_sales) AS numeric), 2) AS p90_sales,
+    
+    ROUND(CAST(100.0 * SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) / COUNT(*) AS numeric), 2) AS stockout_rate_pct,
+    
+    ROUND(CAST(
+        (AVG(CASE WHEN activity_flag = 1 THEN hourly_sales END) / 
+         NULLIF(AVG(CASE WHEN activity_flag = 0 THEN hourly_sales END), 0) - 1
+        ) * 100 AS numeric), 
+    1) AS activity_lift_percentage
+
+FROM hourly_business_summary
+GROUP BY activity_flag
+ORDER BY activity_flag DESC;

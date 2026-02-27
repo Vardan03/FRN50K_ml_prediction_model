@@ -215,28 +215,104 @@ class FeatureEngineer:
         
         return df
     
-    def engineer_all_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def handle_missing_values(self, df: pd.DataFrame, strategy: str = 'forward_fill') -> pd.DataFrame:
+        """
+        Handle missing values appropriately for time series data.
+        
+        Teaching concept: Missing value handling affects model performance.
+        For time series, forward fill is often preferred over mean imputation.
+        
+        Args:
+            df: Input dataframe
+            strategy: 'forward_fill', 'backward_fill', 'mean', or 'zero'
+        
+        Returns:
+            Dataframe with missing values handled
+        """
+        df = df.copy()
+        
+        # Identify missing columns
+        missing_cols = df.columns[df.isnull().any()].tolist()
+        
+        if not missing_cols:
+            logger.info("No missing values detected")
+            return df
+        
+        logger.info(f"Handling {len(missing_cols)} columns with missing values using {strategy} strategy")
+        
+        if strategy == 'forward_fill':
+            # Group by store-product and forward fill within groups
+            df = df.sort_values(['store_id', 'product_id', 'dt']).reset_index(drop=True)
+            for col in missing_cols:
+                df[col] = df.groupby(['store_id', 'product_id'])[col].fillna(method='ffill')
+                # Backward fill for values at start of time series
+                df[col] = df[col].fillna(method='bfill')
+                # Fill any remaining with mean
+                df[col] = df[col].fillna(df[col].mean())
+        
+        elif strategy == 'backward_fill':
+            for col in missing_cols:
+                df = df.sort_values(['store_id', 'product_id', 'dt']).reset_index(drop=True)
+                df[col] = df.groupby(['store_id', 'product_id'])[col].fillna(method='bfill')
+                df[col] = df[col].fillna(method='ffill')
+                df[col] = df[col].fillna(df[col].mean())
+        
+        elif strategy == 'mean':
+            for col in missing_cols:
+                df[col] = df[col].fillna(df[col].mean())
+        
+        elif strategy == 'zero':
+            for col in missing_cols:
+                df[col] = df[col].fillna(0)
+        
+        logger.info(f"Missing values handled. Remaining nulls: {df.isnull().sum().sum()}")
+        return df
+    
+    def engineer_all_features(self, df: pd.DataFrame, handle_missing: bool = True, missing_strategy: str = 'forward_fill', skip_categorical: bool = False) -> pd.DataFrame:
         """
         Apply all feature engineering steps in the correct order.
         
         Teaching point: Feature engineering pipeline order matters!
         Some features depend on others being created first.
+        
+        Args:
+            df: Input dataframe
+            handle_missing: Whether to handle missing values
+            missing_strategy: Strategy for handling missing values
+            skip_categorical: Whether to skip categorical feature creation (useful when computing aggregations separately)
+        
+        Returns:
+            Dataframe with engineered features
         """
         logger.info("Starting comprehensive feature engineering pipeline...")
         
         original_cols = len(df.columns)
         
+        # Step 0: Handle missing values if needed
+        if handle_missing:
+            df = self.handle_missing_values(df, strategy=missing_strategy)
+        
         # Step 1: Temporal features (these don't depend on other features)
         df = self.create_temporal_features(df)
         
         # Step 2: Categorical features (these create new base features)
-        # df = self.create_categorical_features(df)
+        if not skip_categorical:
+            try:
+                df = self.create_categorical_features(df)
+            except Exception as e:
+                logger.warning(f"Categorical features failed (expected for synthetic data): {e}")
         
         # Step 3: Lag features (these depend on having clean temporal data)
-        # df = self.create_lag_features(df)
+        try:
+            df = self.create_lag_features(df)
+        except Exception as e:
+            logger.warning(f"Lag features skipped: {e}")
         
         # Step 4: Rolling features (these depend on temporal ordering)
-        # df = self.create_rolling_features(df)
+        try:
+            df = self.create_rolling_features(df)
+        except Exception as e:
+            logger.warning(f"Rolling features skipped: {e}")
         
         # Step 5: Interaction features (these depend on base features existing)
         df = self.create_interaction_features(df)
@@ -244,4 +320,23 @@ class FeatureEngineer:
         final_cols = len(df.columns)
         logger.info(f"Feature engineering complete: {original_cols} → {final_cols} features (+{final_cols - original_cols})")
         
+        # Fill any remaining NaN values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mean())
+        
         return df
+    
+    @staticmethod
+    def get_feature_names(df: pd.DataFrame, exclude_cols: List[str] = None) -> List[str]:
+        """
+        Get list of feature column names (excluding identifiers and target).
+        
+        Teaching: Feature selection is crucial for model performance and interpretability.
+        """
+        if exclude_cols is None:
+            exclude_cols = ['store_id', 'product_id', 'city_id', 'dt', 'sale_amount']
+        
+        feature_cols = [col for col in df.columns if col not in exclude_cols]
+        return feature_cols

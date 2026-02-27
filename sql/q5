@@ -1,0 +1,6 @@
+-- What is the average sales per hour?
+
+select 
+	sale_amount / array_length(hours_sale_arr, 1) as avg_sales_per_hour
+from sales_data
+	

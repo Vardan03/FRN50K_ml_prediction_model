@@ -1,0 +1,7 @@
+-- Do rainy days (precipitation > 0) affect sales compared to clear days?
+
+select precpt
+from sales_data
+where precpt > 0
+
+-- there is no data with precipitation = 0

@@ -28,7 +28,7 @@ from data.data_loader import FreshRetailDataLoader
 from data.feature_engineering import FeatureEngineer
 from models.baseline.linear_models import LinearForecastingModel
 from models.baseline.tree_models import TreeForecastingModel
-from models.baseline.naive_models import NaiveForecaster
+from models.baseline.naive_models import SimpleNaiveModel  #NaiveForecaster
 from evaluate.metrics import ForecastingMetrics
 
 # Configure logging
@@ -86,6 +86,10 @@ def load_and_prepare_data(config: dict, sample_size = None) -> tuple[pd.DataFram
     
     Teaching note: This function demonstrates the complete data preparation pipeline
     that students should understand and be able to modify.
+    
+    CRITICAL: Train and eval data come from different sources (parquet vs CSV).
+    We compute aggregation statistics from training data ONLY, then apply those
+    same statistics to both train and eval data to ensure consistency.
     """
     logger.info("Loading data...")
     
@@ -108,11 +112,57 @@ def load_and_prepare_data(config: dict, sample_size = None) -> tuple[pd.DataFram
     logger.info("Starting feature engineering...")
     feature_engineer = FeatureEngineer(config['preprocessing'])
     
-    # Apply feature engineering to both train and eval data
-    train_data_fe = feature_engineer.engineer_all_features(train_data)
-    eval_data_fe = feature_engineer.engineer_all_features(eval_data)
+    # IMPORTANT: Compute aggregations from TRAINING data only
+    logger.info("Computing aggregation statistics from training data...")
+    
+    # Compute store-level aggregations from training data
+    store_stats = train_data.groupby('store_id').agg({
+        'sale_amount': ['mean', 'std', 'max'],
+        'product_id': 'nunique'
+    }).round(2)
+    store_stats.columns = ['store_avg_sales', 'store_sales_volatility', 'store_max_sales', 'store_product_count']
+    
+    # Compute product-level aggregations from training data
+    product_stats = train_data.groupby('product_id').agg({
+        'sale_amount': ['mean', 'std'],
+        'store_id': 'nunique'
+    }).round(2)
+    product_stats.columns = ['product_avg_sales', 'product_sales_volatility', 'product_store_count']
+    
+    # Compute city-level aggregations from training data
+    city_stats = train_data.groupby('city_id').agg({
+        'sale_amount': 'mean',
+        'hours_stock_status': 'mean'
+    }).round(2)
+    city_stats.columns = ['city_avg_sales', 'city_stock_availability']
+    
+    # Function to apply pre-computed aggregations
+    def apply_aggregations(df, store_stats, product_stats, city_stats):
+        df = df.copy()
+        df = df.merge(store_stats, on='store_id', how='left')
+        df = df.merge(product_stats, on='product_id', how='left')
+        df = df.merge(city_stats, on='city_id', how='left')
+        
+        # Fill NaN values for items not in training data (eval-only items)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mean())
+        
+        return df
+    
+    # Apply feature engineering with consistent aggregations
+    # Use skip_categorical=True because we're handling aggregations ourselves
+    logger.info("Applying temporal and interaction features to training data...")
+    train_data_fe = feature_engineer.engineer_all_features(train_data, skip_categorical=True)
+    train_data_fe = apply_aggregations(train_data_fe, store_stats, product_stats, city_stats)
+    
+    logger.info("Applying temporal and interaction features to evaluation data...")
+    eval_data_fe = feature_engineer.engineer_all_features(eval_data, skip_categorical=True)
+    eval_data_fe = apply_aggregations(eval_data_fe, store_stats, product_stats, city_stats)
     
     logger.info(f"Feature engineering complete. Features: {train_data_fe.shape[1]}")
+    logger.info(f"Training data shape: {train_data_fe.shape}, Eval data shape: {eval_data_fe.shape}")
     
     return train_data_fe, eval_data_fe
 
@@ -126,9 +176,7 @@ def create_model(model_name: str, config: dict):
     model_config = config['models'].get('baseline', {})
     
     if model_name == 'naive':
-        return NaiveForecaster(
-            strategy='seasonal',
-            seasonal_period=24,
+        return SimpleNaiveModel(
             config=model_config.get('naive', {})
         )
     
@@ -251,7 +299,7 @@ def save_results(model, results: dict, output_dir: str, experiment_name: str):
     # Save model
     model_filename = f"{experiment_name}_{timestamp}.joblib"
     model_path = output_path / model_filename
-    model.save_model(str(model_path))
+    joblib.dump(model, str(model_path))
     
     # Save results
     results_filename = f"{experiment_name}_{timestamp}_results.yaml"

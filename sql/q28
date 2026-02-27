@@ -1,0 +1,42 @@
+-- Identify peak hours based on average sales and activity
+WITH hourly_rank AS (
+    SELECT 
+        hour_of_day,
+        time_of_day,
+        ROUND(AVG(hourly_sales)::numeric, 2) AS avg_sales,
+        ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY hourly_sales)::numeric, 2) AS median_sales,
+        ROUND((100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 1) AS activity_rate_pct,
+        ROUND(AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END)::numeric, 2) AS avg_sales_when_active,
+        COUNT(*) AS total_hours,
+        
+        ROW_NUMBER() OVER (ORDER BY AVG(hourly_sales) DESC) AS sales_rank,
+        ROW_NUMBER() OVER (ORDER BY (100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*)) DESC) AS activity_rank,
+        ROW_NUMBER() OVER (ORDER BY AVG(CASE WHEN hourly_sales > 0 THEN hourly_sales END) DESC) AS intensity_rank
+        
+    FROM hourly_business_summary
+    GROUP BY hour_of_day, time_of_day
+)
+SELECT 
+    hour_of_day,
+    time_of_day,
+    CONCAT('$', avg_sales) AS avg_sales,
+    CONCAT('$', median_sales) AS median_sales,
+    activity_rate_pct || '%' AS activity_rate,
+    CONCAT('$', avg_sales_when_active) AS avg_sales_when_active,
+    total_hours,
+    
+    CASE 
+        WHEN sales_rank <= 6 THEN 'PEAK HOUR (Top 6)'
+        WHEN sales_rank <= 12 THEN 'HIGH ACTIVITY'
+        ELSE 'NORMAL'
+    END AS peak_status,
+    
+    sales_rank,
+    activity_rank,
+    intensity_rank,
+    
+    (sales_rank + activity_rank + intensity_rank) AS combined_rank
+
+FROM hourly_rank
+ORDER BY sales_rank
+LIMIT 24;

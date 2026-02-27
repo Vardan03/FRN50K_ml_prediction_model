@@ -1,0 +1,8 @@
+SELECT
+    city_id,
+    SUM(hourly_sales) AS weekend_sales
+FROM hourly_business_summary
+WHERE is_weekend = 1
+  AND is_promo = 1
+GROUP BY city_id
+ORDER BY weekend_sales DESC;

@@ -1,0 +1,41 @@
+-- Estimate potential sales increase by eliminating all stockouts
+WITH stockout_impact AS (
+    SELECT 
+        COUNT(*) AS total_hours,
+        SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END) AS stockout_hours,
+        ROUND(AVG(hourly_sales)::numeric, 2) AS overall_avg_sales,
+        
+        ROUND(AVG(CASE WHEN is_stockout = 0 THEN hourly_sales END)::numeric, 2) AS avg_sales_in_stock,
+        ROUND(SUM(CASE WHEN is_stockout = 0 THEN hourly_sales ELSE 0 END)::numeric, 2) AS total_sales_in_stock,
+        
+        ROUND(AVG(CASE WHEN is_stockout = 1 THEN hourly_sales END)::numeric, 2) AS avg_sales_during_stockout,
+        ROUND(SUM(CASE WHEN is_stockout = 1 THEN hourly_sales ELSE 0 END)::numeric, 2) AS total_sales_during_stockout,
+        
+        ROUND((100.0 * SUM(CASE WHEN is_stockout = 1 AND hourly_sales > 0 THEN 1 ELSE 0 END) / 
+              NULLIF(SUM(CASE WHEN is_stockout = 1 THEN 1 ELSE 0 END), 0))::numeric, 1) AS activity_rate_during_stockout
+
+    FROM hourly_business_summary
+)
+SELECT 
+    total_hours,
+    stockout_hours,
+    ROUND((100.0 * stockout_hours / total_hours)::numeric, 2) AS stockout_rate_pct,
+    
+    CONCAT('$', ROUND((total_sales_in_stock + total_sales_during_stockout)::numeric, 2)) AS current_total_sales_formatted,
+    ROUND((total_sales_in_stock + total_sales_during_stockout)::numeric, 2) AS current_sales,
+    
+    ROUND((total_sales_in_stock + (avg_sales_in_stock * stockout_hours))::numeric, 2) AS potential_sales,
+    CONCAT('$', ROUND((total_sales_in_stock + (avg_sales_in_stock * stockout_hours))::numeric, 2)) AS potential_sales_formatted,
+    
+    ROUND((avg_sales_in_stock * stockout_hours - total_sales_during_stockout)::numeric, 2) AS incremental_sales_gain,
+    CONCAT('$', ROUND((avg_sales_in_stock * stockout_hours - total_sales_during_stockout)::numeric, 2)) AS gain_formatted,
+    
+    ROUND((100.0 * (avg_sales_in_stock * stockout_hours - total_sales_during_stockout) / 
+           NULLIF((total_sales_in_stock + total_sales_during_stockout), 0))::numeric, 2) AS pct_sales_increase,
+    
+	ROUND((total_sales_in_stock + (avg_sales_in_stock * stockout_hours * 0.8))::numeric, 2) AS conservative_potential_sales,
+    ROUND((avg_sales_in_stock * stockout_hours * 0.8 - total_sales_during_stockout)::numeric, 2) AS conservative_gain,
+    ROUND((100.0 * (avg_sales_in_stock * stockout_hours * 0.8 - total_sales_during_stockout) / 
+           NULLIF((total_sales_in_stock + total_sales_during_stockout), 0))::numeric, 2) AS conservative_pct_increase
+
+FROM stockout_impact;

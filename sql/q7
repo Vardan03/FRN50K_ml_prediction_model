@@ -1,0 +1,10 @@
+-- Show total sales by hour of day. Which hours are busiest?
+
+select
+    hour_index - 1 as hour_of_day,
+    sum(hour_value) as total_sales
+from sales_data,
+     unnest(hours_sale_arr) with ordinality as t(hour_value, hour_index)
+group by hour_index
+order by total_sales desc
+

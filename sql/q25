@@ -1,0 +1,18 @@
+-- Analyze promo effectiveness during stockout vs normal situations
+SELECT 
+    CASE 
+        WHEN is_stockout = 1 AND is_promo = 1 THEN 'STOCKOUT + PROMO'
+        WHEN is_stockout = 1 AND is_promo = 0 THEN 'STOCKOUT ONLY'
+        WHEN is_stockout = 0 AND is_promo = 1 THEN 'PROMO ONLY'
+        ELSE 'NORMAL OPERATIONS'
+    END AS situation_type,
+    
+    COUNT(*) AS total_hours,
+    ROUND(AVG(hourly_sales)::numeric, 2) AS avg_sales,
+    ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY hourly_sales)::numeric, 2) AS median_sales,
+    ROUND(SUM(hourly_sales)::numeric, 2) AS total_sales,
+    ROUND((100.0 * SUM(CASE WHEN hourly_sales > 0 THEN 1 ELSE 0 END) / COUNT(*))::numeric, 1) AS activity_rate_pct
+
+FROM hourly_business_summary
+GROUP BY is_stockout, is_promo
+ORDER BY is_stockout DESC, is_promo DESC;
